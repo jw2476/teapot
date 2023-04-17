@@ -164,6 +164,7 @@ impl Compiler {
         if !output.status.success() {
             println!("{}", String::from_utf8(output.stdout).unwrap());
             println!("{}", String::from_utf8(output.stderr).unwrap());
+            panic!("{} failed to compile", path.display());
         }
 
         self.objects.insert(0, obj);
@@ -196,6 +197,7 @@ impl Compiler {
          if !output.status.success() { 
             println!("{}", String::from_utf8(output.stdout).unwrap());
             println!("{}", String::from_utf8(output.stderr).unwrap());
+            panic!("{} failed to link", name);
         }
     }
 }
@@ -285,16 +287,18 @@ fn compile_leaf(leaf: &Leaf, target_path: &Path) {
         let green: f32 = i as f32 / sources.len() as f32;
         let red: u8 = (red * 256.0) as u8;
         let green = (green * 256.0) as u8;
-        let index_string = i.to_string().truecolor(red, green, 0);
+
+        let progress = format!("[{}/{}]", i, sources.len());
 
         print!("\r                                                   ");
-        print!("\r[{}/{}] {} {}", index_string, sources.len(), "Compiling:".green().bold(), leaf.config.package.name);
+        print!("\r{:13} {} {} v{}", progress.truecolor(red, green, 0), "Compiling:".green().bold(), leaf.config.package.name, leaf.config.package.version);
         std::io::stdout().flush().unwrap();
         compiler.file(source);
     }
 
+    let progress = format!("[{0}/{0}]", sources.len());
     print!("\r                                                        ");
-    print!("\r[{0}/{0}] {1} {2}", sources.len(), "Linking:".green().bold(), leaf.config.package.name);
+    print!("\r{:13} {} {} v{}", progress.truecolor(0, 255, 0), "Linking:".green().bold(), leaf.config.package.name, leaf.config.package.version);
     compiler.compile(&leaf.config.package.name, if bin { OutputType::Binary } else { OutputType::Library });
     println!("");
 }

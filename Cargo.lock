@@ -402,19 +402,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "teapot"
-version = "0.1.0"
-dependencies = [
- "cc",
- "clap",
- "colored",
- "serde",
- "term",
- "toml",
- "walkdir",
-]
-
-[[package]]
 name = "term"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -477,6 +464,19 @@ dependencies = [
  "serde_spanned",
  "toml_datetime",
  "winnow",
+]
+
+[[package]]
+name = "tpot"
+version = "0.1.0"
+dependencies = [
+ "cc",
+ "clap",
+ "colored",
+ "serde",
+ "term",
+ "toml",
+ "walkdir",
 ]
 
 [[package]]
