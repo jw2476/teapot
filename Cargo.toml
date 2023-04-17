@@ -2,6 +2,11 @@
 name = "teapot"
 version = "0.1.0"
 edition = "2021"
+authors = ["Jack Whitehorn jackwh.whitehorn@gmail.com"]
+description = "A cargo inspired build tool for C"
+homepage = "https://github.com/jw2476/teapot"
+repository = "https://github.com/jw2476/teapot"
+keywords = ["cli", "build", "c"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
