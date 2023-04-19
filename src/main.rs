@@ -1,4 +1,5 @@
 #![feature(let_chains)]
+#![feature(path_file_prefix)]
 
 use std::{collections::HashMap, path::{PathBuf, Path}, process::Command, io::Write};
 use colored::Colorize;
@@ -33,7 +34,7 @@ pub struct TeaConfig {
     package: Package,
     dependencies: HashMap<String, toml::Value>,
     #[serde(default)]
-    defines: Defines
+    defines: Option<Defines>
 }
 
 #[derive(Parser, Debug)]
@@ -55,13 +56,23 @@ struct NewData {
 #[derive(Debug, Args)]
 struct BrewData {
     #[arg(long, default_value_t = false)]
+    release: bool,
+    #[arg(long, default_value_t = false)]
+    debug: bool,
+    #[arg(long, default_value_t = false)]
+    pour: bool
+}
+
+#[derive(Debug, Args)]
+struct PourData {
+    #[arg(long, default_value_t = false)]
     release: bool
 }
 
 #[derive(Subcommand, Debug)]
 enum Commands {
     New(NewData),
-    Brew(BrewData)
+    Brew(BrewData),
 }
 
 fn create_leaf(data: NewData) {
@@ -88,7 +99,7 @@ fn create_leaf(data: NewData) {
                 authors: Vec::new()
             },
             dependencies: HashMap::new(),
-            defines: Defines::default() 
+            defines: None
         };
 
         let config_string = toml::to_string(&config).expect("Failed to serialise config");
@@ -144,7 +155,7 @@ impl Compiler {
     pub fn file(&mut self, path: &Path) {
         let obj = self.target_directory.clone().join("objects").join(path.with_extension("o"));
         std::fs::create_dir_all(obj.parent().unwrap()).unwrap();
-        let mut cmd = Command::new("cc");
+        let mut cmd = Command::new("tcc");
 
         self.defines.iter().for_each(|(name, value)| {
             if let Some(v) = value {
@@ -179,7 +190,7 @@ impl Compiler {
          let artifact_path = self.target_directory.join(file);
         
          let output = match output {
-             OutputType::Binary => Command::new("cc")
+             OutputType::Binary => Command::new("tcc")
                  .args(&self.link_flags)
                  .args(&self.objects)
                  .arg("-o")
@@ -235,22 +246,60 @@ fn link_dependencies(leaf: &Leaf, compiler: &mut Compiler) {
     })
 }
 
-fn compile_leaf(leaf: &Leaf, target_path: &Path) {
-    for dependency in &leaf.dependencies {
-        compile_leaf(dependency, target_path);
-    }
+fn get_defines(leaf: &Leaf) -> Vec<(String, String)> {
+    let base_defines = leaf.config.defines.clone().unwrap_or_else(Defines::default);
 
-    let sources = WalkDir::new(leaf.path.join("src")).into_iter().filter_map(|e| e.ok()).filter_map(|entry| {
+    let mut defines = base_defines.all.unwrap_or_else(toml::Table::new).into_iter().collect::<Vec<(String, toml::Value)>>();
+    #[cfg(target_os = "windows")]
+    defines.append(&mut base_defines.windows.unwrap_or_else(toml::Table::new).into_iter().collect::<Vec<(String, toml::Value)>>());
+    #[cfg(target_os = "linux")]
+    defines.append(&mut base_defines.linux.unwrap_or_else(toml::Table::new).into_iter().collect::<Vec<(String, toml::Value)>>());
+
+    defines.iter().filter_map(|(name, value)| {
+        Some((name.to_owned(), match value {
+            toml::Value::Integer(data) => data.to_string(),
+            toml::Value::Float(data) => data.to_string(),
+            toml::Value::Boolean(data) => data.to_string(),
+            toml::Value::String(data) => format!("\"{}\"", data),
+            _ => return None
+        }))
+    }).collect()
+}
+
+fn get_sources(leaf: &Leaf) -> Vec<PathBuf> { 
+    let os_list = vec!["windows", "linux"];
+
+    WalkDir::new(leaf.path.join("src")).into_iter().filter_map(|e| e.ok()).filter_map(|entry| {
         if let Some(extension) = entry.path().extension() && extension == "c" {
             Some(entry.path().to_owned())
         } else {
             None
         }
-    }).collect::<Vec<PathBuf>>();
+    }).filter_map(|path| {
+        let os_extension = path.file_stem()?.to_str()?.split(".").last()?;
+        if !os_list.contains(&os_extension) || (os_list.contains(&os_extension) && os_extension == std::env::consts::OS) {
+            Some(path)
+        } else {
+            None
+        }
+    }).collect::<Vec<PathBuf>>()
+}
+
+fn compile_leaf(leaf: &Leaf, target_path: &Path, cmd: &BrewData) {
+    for dependency in &leaf.dependencies {
+        compile_leaf(dependency, target_path, cmd);
+    }
  
-    let bin = sources.iter().find(|source| source.file_stem().unwrap() == "main").is_some();
+    let sources = get_sources(leaf);
+    let bin = sources.iter().find(|source| source.file_prefix().unwrap() == "main").is_some();
     
     let mut compiler = Compiler::new(target_path);
+    if cmd.release { 
+        compiler.set_optimization_level(3);
+    } else if cmd.debug {
+        compiler.enable_debug_info();
+    }
+
     compiler.include(leaf.path.join("include").to_str().unwrap());
     compiler.include(leaf.path.join("src").to_str().unwrap());
 
@@ -259,23 +308,14 @@ fn compile_leaf(leaf: &Leaf, target_path: &Path) {
     }
 
     link_dependencies(leaf, &mut compiler); 
-
-    let mut defines = leaf.config.defines.all.clone().unwrap_or(toml::Table::new()).into_iter().collect::<Vec<(String, toml::Value)>>();
+    
     #[cfg(target_os = "windows")]
-    defines.append(&mut leaf.config.defines.windows.clone().unwrap_or(toml::Table::new()).into_iter().collect::<Vec<(String, toml::Value)>>());
+    compiler.define::<String>("PLATFORM_WINDOWS", None);
     #[cfg(target_os = "linux")]
-    defines.append(&mut leaf.config.defines.linux.clone().unwrap_or(toml::Table::new()).into_iter().collect::<Vec<(String, toml::Value)>>());
-
-    defines.iter().filter_map(|(name, value)| {
-        Some((name, match value {
-            toml::Value::String(data) => data.clone(),
-            toml::Value::Integer(data) => data.to_string(),
-            toml::Value::Float(data) => data.to_string(),
-            toml::Value::Boolean(data) => data.to_string(),
-            _ => return None
-        }))
-    }).for_each(|(name, value)| {
-        if value == "" {
+    compiler.define::<String>("PLATFORM_LINUX", None);
+    
+    get_defines(leaf).iter().for_each(|(name, value)| {
+        if value == "\"\"" {
             compiler.define::<String>(name, None);
         } else {
             compiler.define(name, Some(value));
@@ -301,14 +341,20 @@ fn compile_leaf(leaf: &Leaf, target_path: &Path) {
     print!("\r{:13} {} {} v{}", progress.truecolor(0, 255, 0), "Linking:".green().bold(), leaf.config.package.name, leaf.config.package.version);
     compiler.compile(&leaf.config.package.name, if bin { OutputType::Binary } else { OutputType::Library });
     println!("");
+
+    if cmd.pour && bin {
+        let pour = Command::new(format!("./{}/{}", target_path.display(), leaf.config.package.name)).output().expect("Failed to pour");
+        println!("{}", String::from_utf8(pour.stdout).unwrap());
+        println!("{}", String::from_utf8(pour.stderr).unwrap());
+    }
 }
 
-fn brew(data: BrewData) {
+fn brew(cmd: BrewData) {
     let config_string = std::fs::read("tea.toml").expect("Can't read tea.toml");
     let config: TeaConfig = toml::from_str(&String::from_utf8(config_string).unwrap()).unwrap();
 
     let leaf = resolve_dependencies(config, PathBuf::new());
-    compile_leaf(&leaf, if data.release { Path::new("target/release") } else { Path::new("target/debug") });
+    compile_leaf(&leaf, if cmd.release { Path::new("target/release") } else { Path::new("target/debug") }, &cmd);
 }
 
 fn main() {
@@ -316,6 +362,6 @@ fn main() {
 
     match cli.commands {
         Commands::New(data) => create_leaf(data),
-        Commands::Brew(data) => brew(data)
+        Commands::Brew(data) => brew(data),
     };
 }
