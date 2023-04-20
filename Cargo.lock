@@ -476,6 +476,7 @@ dependencies = [
  "serde",
  "term",
  "toml",
+ "toml_edit",
  "walkdir",
 ]
 
