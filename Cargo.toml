@@ -16,6 +16,7 @@ cc = "1.0.79"
 clap = { version = "4.2.2", features = ["derive"] }
 colored = "2.0.0"
 duct = "0.13.6"
+rayon = "1.7.0"
 serde = { version = "1.0.160", features = ["derive"] }
 term = "0.7.0"
 toml = "0.7.3"

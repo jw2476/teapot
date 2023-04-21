@@ -158,15 +158,7 @@ impl Leaf {
             compiler.define(name, value.clone());
         });
 
-        sources.iter().enumerate().for_each(|(i, source)| {
-            let red = 1.0 - (i as f32 / sources.len() as f32);
-            let green = i as f32 / sources.len() as f32;
-            let progress = format!("[{}/{}]", i, sources.len()).truecolor((red * 256.0) as u8, (green * 256.0) as u8, 0).bold();
-            
-            Self::clear();
-            print!("\r{:13} {} {}", progress, "Compiling".green().bold(), &self.config.package.name);
-            compiler.compile(source);
-        });
+        compiler.compile(&sources, &self.config.package.name);
 
         self.get_dependencies().iter().filter(|name| name != &&self.config.package.name).for_each(|dependency| {
             compiler.add_static_library(dependency);

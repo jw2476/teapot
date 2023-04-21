@@ -1,4 +1,7 @@
-use std::{path::{PathBuf, Path}, process::Command};
+use std::{path::{PathBuf, Path}, process::Command, sync::atomic::{AtomicUsize, Ordering}};
+
+use colored::Colorize;
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
 
 pub enum OutputType {
@@ -46,35 +49,49 @@ impl Compiler {
         self.compile_flags.push("-g".to_owned());
     }
 
-    pub fn compile(&mut self, path: &Path) {
-        let obj = self.target_directory.clone().join("objects").join(path.with_extension("o"));
-        std::fs::create_dir_all(obj.parent().unwrap()).unwrap();
-        let mut cmd = Command::new("tcc");
+    pub fn compile(&mut self, paths: &[PathBuf], name: &str) {
+        let progress = AtomicUsize::new(0);
 
-        self.defines.iter().for_each(|(name, value)| {
-            if let Some(v) = value {
-                cmd.arg(&format!("-D{}={}", name, v));
-            } else {
-                cmd.arg(&format!("-D{}", name));
+        paths.par_iter().for_each(|path| {
+            let obj = self.target_directory.clone().join("objects").join(path.with_extension("o"));
+            std::fs::create_dir_all(obj.parent().unwrap()).unwrap();
+            let mut cmd = Command::new("tcc");
+
+            self.defines.iter().for_each(|(name, value)| {
+                if let Some(v) = value {
+                    cmd.arg(&format!("-D{}={}", name, v));
+                } else {
+                    cmd.arg(&format!("-D{}", name));
+                }
+            });
+
+            cmd.args(&self.compile_flags)
+                .arg("-c")
+                .arg(path)
+                .arg("-o")
+                .arg(obj.clone());
+
+            let output = cmd.output().expect(&format!("Failed to compile {}", path.display()));
+
+            if !output.status.success() {
+                println!("{:#?}", cmd);
+                println!("{}", String::from_utf8(output.stdout).unwrap());
+                println!("{}", String::from_utf8(output.stderr).unwrap());
+                panic!("{} failed to compile", path.display());
             }
+
+            let value = progress.fetch_add(1, Ordering::SeqCst);
+            let red = 1.0 - (value as f32 / paths.len() as f32);
+            let green = value as f32 / paths.len() as f32;
+            let progress_str = format!("[{}/{}]", value, paths.len()).truecolor((red * 256.0) as u8, (green * 256.0) as u8, 0).bold();
+            print!("\r                                 ");
+            print!("\r{:13} {} {}", progress_str, "Compiling".green().bold(), name);
         });
 
-        cmd.args(&self.compile_flags)
-            .arg("-c")
-            .arg(path)
-            .arg("-o")
-            .arg(obj.clone());
-
-        let output = cmd.output().expect(&format!("Failed to compile {}", path.display()));
-
-        if !output.status.success() {
-            println!("{:#?}", cmd);
-            println!("{}", String::from_utf8(output.stdout).unwrap());
-            println!("{}", String::from_utf8(output.stderr).unwrap());
-            panic!("{} failed to compile", path.display());
-        }
-
-        self.objects.insert(0, obj);
+        paths.iter().for_each(|path| {
+            let obj = self.target_directory.clone().join("objects").join(path.with_extension("o"));
+            self.objects.insert(0, obj);
+        });
     }
 
     pub fn link(&self, name: &str, output: OutputType) {
