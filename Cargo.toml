@@ -1,6 +1,6 @@
 [package]
 name = "tpot"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license = "GPL-3.0-or-later"
 authors = ["Jack Whitehorn jackwh.whitehorn@gmail.com"]
