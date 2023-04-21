@@ -3,7 +3,7 @@ A cargo inspired C build system with in-build formatting, linting, dependencies,
 
 ## Getting Started
 To install teapot run:
-`cargo install teapot`
+`cargo install tpot`
 
 ### Dependencies
 
