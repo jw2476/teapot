@@ -1,6 +1,9 @@
 use std::{path::{PathBuf, Path}, collections::HashMap};
 
+use clap::{CommandFactory, error::ErrorKind};
 use toml_edit::{Document, Table, Value, Item};
+
+use crate::cli::Cli;
 
 #[derive(Debug)]
 pub struct TeaConfig {
@@ -9,11 +12,14 @@ pub struct TeaConfig {
     pub defines: Defines
 }
 
-const BASE_FEATURES: &[&str] = &["windows", "linux"];
+pub const BASE_FEATURES: &[&str] = &["windows", "linux"];
 
 impl TeaConfig {
     pub fn parse(path: &Path) -> Option<Self> {
-        let text = String::from_utf8(std::fs::read(path.join("tea.toml")).expect("Can't find tea.toml")).unwrap();
+        let text = String::from_utf8(std::fs::read(path.join("tea.toml")).unwrap_or_else(|_| {
+            println!("Can't find tea.toml in {}", path.display());
+            std::process::exit(1);
+        })).unwrap();
         let document = text.parse::<Document>().ok()?;
         let package = Package::parse(document.get("package")?.as_table()?)?;
 
@@ -86,7 +92,7 @@ impl Dependencies {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Dependency {
     pub name: String,
     pub path: Option<PathBuf>,
@@ -112,8 +118,8 @@ impl Dependency {
 
 #[derive(Debug, Default)]
 pub struct Defines {
-    base: Vec<(String, Option<String>)>,
-    features: HashMap<String, Vec<(String, Option<String>)>>
+    pub base: Vec<(String, Option<String>)>,
+    pub features: HashMap<String, Vec<(String, Option<String>)>>
 }
 
 impl Defines {

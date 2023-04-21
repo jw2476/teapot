@@ -26,8 +26,8 @@ impl Compiler {
         }
     }
 
-    pub fn include(&mut self, path: &str) {
-        self.compile_flags.push(format!("-I{}", path));
+    pub fn include(&mut self, path: &Path) {
+        self.compile_flags.push(format!("-I{}", path.display()));
     }
 
     pub fn add_static_library(&mut self, name: &str) {
@@ -64,9 +64,11 @@ impl Compiler {
             .arg(path)
             .arg("-o")
             .arg(obj.clone());
-        let output = cmd.output().expect("Failed to compile");
+
+        let output = cmd.output().expect(&format!("Failed to compile {}", path.display()));
 
         if !output.status.success() {
+            println!("{:#?}", cmd);
             println!("{}", String::from_utf8(output.stdout).unwrap());
             println!("{}", String::from_utf8(output.stderr).unwrap());
             panic!("{} failed to compile", path.display());
