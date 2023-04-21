@@ -1,4 +1,4 @@
-# teapot
+# teapot 🫖
 A cargo inspired C build system with in-build formatting, linting, dependencies, registry (coming soon) and multithreaded building
 
 ## Getting Started
