@@ -1,12 +1,15 @@
-use std::{path::{PathBuf, Path}, process::Command, sync::atomic::{AtomicUsize, Ordering}};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use colored::Colorize;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
-
 pub enum OutputType {
     Binary,
-    Library
+    Library,
 }
 
 pub struct Compiler {
@@ -15,7 +18,7 @@ pub struct Compiler {
     link_flags: Vec<String>,
     defines: Vec<(String, Option<String>)>,
 
-    objects: Vec<PathBuf>
+    objects: Vec<PathBuf>,
 }
 
 impl Compiler {
@@ -25,7 +28,7 @@ impl Compiler {
             compile_flags: Vec::new(),
             link_flags: vec!["-lm".to_owned()],
             objects: Vec::new(),
-            defines: Vec::new()
+            defines: Vec::new(),
         }
     }
 
@@ -34,11 +37,13 @@ impl Compiler {
     }
 
     pub fn add_static_library(&mut self, name: &str) {
-        self.objects.push(self.target_directory.join(format!("lib{}.a", name)));
+        self.objects
+            .push(self.target_directory.join(format!("lib{}.a", name)));
     }
 
     pub fn define<T: ToString>(&mut self, name: &str, value: Option<T>) {
-       self.defines.push((name.to_owned(), value.map(|s| s.to_string()))); 
+        self.defines
+            .push((name.to_owned(), value.map(|s| s.to_string())));
     }
 
     pub fn set_optimization_level(&mut self, level: u32) {
@@ -53,7 +58,11 @@ impl Compiler {
         let progress = AtomicUsize::new(0);
 
         paths.par_iter().for_each(|path| {
-            let obj = self.target_directory.clone().join("objects").join(path.with_extension("o"));
+            let obj = self
+                .target_directory
+                .clone()
+                .join("objects")
+                .join(path.with_extension("o"));
             std::fs::create_dir_all(obj.parent().unwrap()).unwrap();
             let mut cmd = Command::new("tcc");
 
@@ -71,7 +80,9 @@ impl Compiler {
                 .arg("-o")
                 .arg(obj.clone());
 
-            let output = cmd.output().expect(&format!("Failed to compile {}", path.display()));
+            let output = cmd
+                .output()
+                .expect(&format!("Failed to compile {}", path.display()));
 
             if !output.status.success() {
                 println!("{:#?}", cmd);
@@ -83,42 +94,53 @@ impl Compiler {
             let value = progress.fetch_add(1, Ordering::SeqCst);
             let red = 1.0 - (value as f32 / paths.len() as f32);
             let green = value as f32 / paths.len() as f32;
-            let progress_str = format!("[{}/{}]", value, paths.len()).truecolor((red * 256.0) as u8, (green * 256.0) as u8, 0).bold();
+            let progress_str = format!("[{}/{}]", value, paths.len())
+                .truecolor((red * 256.0) as u8, (green * 256.0) as u8, 0)
+                .bold();
             print!("\r                                 ");
-            print!("\r{:13} {} {}", progress_str, "Compiling".green().bold(), name);
+            print!(
+                "\r{:13} {} {}",
+                progress_str,
+                "Compiling".green().bold(),
+                name
+            );
         });
 
         paths.iter().for_each(|path| {
-            let obj = self.target_directory.clone().join("objects").join(path.with_extension("o"));
+            let obj = self
+                .target_directory
+                .clone()
+                .join("objects")
+                .join(path.with_extension("o"));
             self.objects.insert(0, obj);
         });
     }
 
     pub fn link(&self, name: &str, output: OutputType) {
-         let file: String = match output {
+        let file: String = match output {
             OutputType::Binary => name.to_owned(),
-            OutputType::Library => format!("lib{}.a", name)
-         };
+            OutputType::Library => format!("lib{}.a", name),
+        };
 
-         let artifact_path = self.target_directory.join(file);
-        
-         let output = match output {
-             OutputType::Binary => Command::new("tcc")
-                 .args(&self.link_flags)
-                 .args(&self.objects)
-                 .arg("-o")
-                 .arg(artifact_path)
-                 .output()
-                 .expect("Failed to link"),
-             OutputType::Library => Command::new("ar")
-                 .arg("rcs")
-                 .arg(artifact_path)
-                 .args(&self.objects)
-                 .output()
-                 .expect("Failed to archive")
-         };
-        
-         if !output.status.success() { 
+        let artifact_path = self.target_directory.join(file);
+
+        let output = match output {
+            OutputType::Binary => Command::new("tcc")
+                .args(&self.link_flags)
+                .args(&self.objects)
+                .arg("-o")
+                .arg(artifact_path)
+                .output()
+                .expect("Failed to link"),
+            OutputType::Library => Command::new("ar")
+                .arg("rcs")
+                .arg(artifact_path)
+                .args(&self.objects)
+                .output()
+                .expect("Failed to archive"),
+        };
+
+        if !output.status.success() {
             println!("{}", String::from_utf8(output.stdout).unwrap());
             println!("{}", String::from_utf8(output.stderr).unwrap());
             panic!("{} failed to link", name);

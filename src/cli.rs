@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
-use clap::{Parser, Args, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 pub struct Cli {
     #[command(subcommand)]
-    pub commands: Commands
+    pub commands: Commands,
 }
 
 #[derive(Subcommand, Debug)]
@@ -13,17 +13,19 @@ pub enum Commands {
     New(NewData),
     Brew(BrewData),
     Pour,
-    Add(AddData)
+    Add(AddData),
+    Format,
+    Lint
 }
- 
+
 #[derive(Debug, Args)]
-pub struct NewData { 
+pub struct NewData {
     #[arg(long, default_value_t = false)]
     pub lib: bool,
     #[arg(long, default_value_t = false)]
     pub bin: bool,
 
-    pub name: String
+    pub name: String,
 }
 
 #[derive(Debug, Args, Clone)]
@@ -40,7 +42,6 @@ pub struct AddData {
     pub features: Option<String>,
     #[arg(long)]
     pub path: PathBuf,
-    
-    pub name: String
-}
 
+    pub name: String,
+}
