@@ -21,13 +21,9 @@ If everything went well, there will now be a folder called my_first_leaf contain
 
 ### Building and Running Leaves
 
-Building to an executable or static library file in the `target` folder:
+To build your leaf run `tpot brew`, the artifact will be stored in the `target` directory
 
-`tpot brew`
-
-Or to compile and run with one command:
-
-`tpot pour`
+Or to compile and run with one command, use `tpot pour`:
 
 From there it's just more of the same. Teapot will find new C files as you create them, building and linking them at blazingly fast speeds thanks to TCC.
 
@@ -57,7 +53,7 @@ This currently relies on clang-tidy and just uses the default lints, but a syste
 
 ### Notes on Libraries
 
-To create a library leaf, use the `--lib` flag on the `tpot new` command. Library leaves have an include directory in addition to the src directory. Any header files within the include directory will be made available to external use.
+To create a library leaf, use the `--lib` flag on the `tpot new` command. Library leaves have an include directory in addition to the src directory. Any header files within the include directory will be made available for external use.
 
 ### Features
 
