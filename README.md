@@ -1,5 +1,5 @@
 # teapot 🫖
-A cargo inspired C build system with in-build formatting, linting, dependencies, registry (coming soon) and multithreaded building
+A cargo inspired C build system with built-in formatting, linting, dependencies, registry (coming soon), and multithreaded building
 
 ## Getting Started
 To install teapot run:
@@ -7,7 +7,7 @@ To install teapot run:
 
 ### Dependencies
 
-There are a few dependencies that teapot relies on, most of these can be installed with a few commands:
+There are a few dependencies that teapot relies on. Most of these can be installed with a few commands:
  - TCC - https://github.com/TinyCC/tinycc
  - clang-format (Only needed for formatting)
  - clang-tidy (Only needed for linting)
@@ -21,24 +21,23 @@ If everything went well, there will now be a folder called my_first_leaf contain
 
 ### Building and Running Leaves
 
-To build run, an executable or static library file will be placed in the target folder:
+Building to an executable or static library file in the `target` folder:
 
 `tpot brew`
 
-Or to just compile and run all in one step use:
+Or to compile and run with one command:
 
 `tpot pour`
 
-From there it's just more of the same, teapot will find new C files as you create them, building and linking them at blazingly fast speeds thanks to TCC.
+From there it's just more of the same. Teapot will find new C files as you create them, building and linking them at blazingly fast speeds thanks to TCC.
 
 ### Dependencies
 
-Eventually you'll need to add dependencies to your code and assuming the project already works with teapot, 
-its as simple as downloading the leaf to your computer and running:
+Eventually you'll need to add dependencies to your code. Assuming the dependency supports teapot, it's as simple as downloading the leaf to your computer and running `tpot add`. For example, to add raylib:
 
 `tpot add raylib --path deps/raylib --features text,shapes`
 
-The local folder will be checked for a tea.toml file, built into a static library and linked into your program.
+The local folder will be checked for a tea.toml file, built into a static library, and linked into your program.
 
 ### Formatting
 
@@ -58,14 +57,15 @@ This currently relies on clang-tidy and just uses the default lints, but a syste
 
 ### Notes on Libraries
 
-To create a library leaf, use the --lib flag on the tpot new command. Library leaves have an include directory in addition to the src directory, any header files within the include directory will be made available for external use.
+To create a library leaf, use the `--lib` flag on the `tpot new` command. Library leaves have an include directory in addition to the src directory. Any header files within the include directory will be made available to external use.
 
 ### Features
 
-Features are the teapot's way of configuring what's compiled based on things like operating systems, desktop environments and so on. 
-The available features for a leaf are specified in the tea.toml file at `package.features`. In addition to the user-defined features, there are many predefined features such as windows and linux which get defined based on target operating system. 
-If a feature is enabled the macro `FEATURE_[NAME]` will be defined e.g. if the target OS is windows the `FEATURE_WINDOWS` macro will be defined.
-In addition to macros, any files ending in `.[NAME].c` will only be compiled if the feature is enabled e.g. if the target OS is linux the file `awesome.windows.c` will not be compiled but `awesome.linux.c` will.
+Features are teapot's way of configuring what's compiled based on operating system, desktop environments, etc.
+
+The available features for a leaf are specified in the tea.toml file at `package.features`. In addition to the user-defined features, teapot comes with predefined features such as windows and linux which are defined based on the target operating system.
+
+If a feature is enabled the macro `FEATURE_[NAME]` will be defined. For example, if the target OS is Windows the `FEATURE_WINDOWS` macro will be defined. In addition to macros, and files ending in `.[NAME].c` will only be compiled if the feature is enabled. For example, if the target OS is Linux the file `awesome.windows.c` will be ignored and `awesome.linux.c` compiled.
 
 ## Changelog
 
