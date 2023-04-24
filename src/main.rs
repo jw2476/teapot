@@ -54,7 +54,7 @@ fn new(cmd: NewData) {
     } else {
         std::fs::write(
             format!("{}/src/main.c", &cmd.name),
-            "#include <stdio.h>\n\nint main() {\n\tprintf(\"Hello, World!\");\n\treturn 0;\n}",
+            format!("#include <stdio.h>\n\nint {}_main() {{\n\tprintf(\"Hello, World!\");\n\treturn 0;\n}}", &cmd.name),
         )
         .unwrap();
     }
@@ -199,10 +199,6 @@ impl Leaf {
             })
             .collect();
 
-        let bin = sources
-            .iter()
-            .find(|path| path.file_name().unwrap().to_str().unwrap() == "main.c")
-            .is_some();
         let mut compiler = Compiler::new(Path::new("target"));
         compiler.include(&self.path.join("include"));
         compiler.include(&self.path.join("src"));
@@ -231,13 +227,6 @@ impl Leaf {
 
         compiler.compile(&sources, &self.config.package.name);
 
-        self.get_dependencies()
-            .iter()
-            .filter(|name| name != &&self.config.package.name)
-            .for_each(|dependency| {
-                compiler.add_static_library(dependency);
-            });
-
         let progress = format!("[{0}/{0}]", sources.len())
             .truecolor(0, 255, 0)
             .bold();
@@ -250,12 +239,34 @@ impl Leaf {
         );
         compiler.link(
             &self.config.package.name,
-            if bin {
-                OutputType::Binary
-            } else {
-                OutputType::Library
-            },
+            OutputType::Library
         );
+    }
+
+    pub fn link(&self, cmd: BrewData) {
+        let mut compiler = Compiler::new(Path::new("target"));
+        if cmd.release {
+            compiler.set_optimization_level(3);
+        }
+        if cmd.debug {
+            compiler.enable_debug_info()
+        }
+
+        compiler.compile(&[Path::new("target/main.c").to_owned()], &self.config.package.name);
+
+        let dependencies = self.get_dependencies();
+        dependencies.iter().for_each(|dependency| {
+            compiler.add_static_library(dependency);
+        });
+        
+        Self::clear();
+        println!(
+            "\r{:13} {} {}",
+            String::new(),
+            "Finishing".green().bold(),
+            &self.config.package.name
+        );
+        compiler.link(&self.config.package.name, OutputType::Binary);
     }
 }
 
@@ -263,16 +274,25 @@ fn brew(cmd: BrewData) {
     let config = load_config(Path::new(""));
 
     let leaf = Leaf::from_config(config, add_default_features(&[]), Path::new(""));
-    leaf.compile(cmd);
+    leaf.compile(cmd.clone());
+
+    let main = format!("int main() {{\n\t{}_main();\n}}", leaf.config.package.name);
+    std::fs::write("target/main.c", main).unwrap();
+
+    leaf.link(cmd);
 }
 
 fn pour() {
     let config = load_config(Path::new(""));
     let leaf = Leaf::from_config(config, add_default_features(&[]), Path::new(""));
-    leaf.compile(BrewData {
-        release: false,
-        debug: false,
-    });
+
+    let brew = BrewData { release: false, debug: false };
+    leaf.compile(brew.clone());
+
+    let main = format!("int main() {{\n\t{}_main();\n}}", leaf.config.package.name);
+    std::fs::write("target/main.c", main).unwrap();
+
+    leaf.link(brew);
 
     duct::cmd!(format!("target/{}", leaf.config.package.name))
         .run()
@@ -347,6 +367,25 @@ fn lint() {
     duct::cmd("clang-tidy", args).run().unwrap();
 }
 
+fn sip() {
+    let config = load_config(Path::new(""));
+    let leaf = Leaf::from_config(config, add_default_features(&[]), Path::new(""));
+    let brew = BrewData { release: false, debug: false };
+    leaf.compile(BrewData { release: false, debug: false });
+
+    let symbols = duct::cmd!("nm", "-f", "just-symbols", format!("target/lib{}.a", leaf.config.package.name)).read().unwrap();
+    let tests = symbols.lines().filter(|symbol| symbol.starts_with("test_")).collect::<Vec<&str>>();
+    println!("Found tests: {:?}", tests);
+
+    let forward = tests.iter().map(|test| format!("void {}();", test)).collect::<Vec<String>>().join("\n");
+    let body = tests.iter().map(|test| format!("\tprintf(\"Testing {0}\\n\");\n\t{0}();", test)).collect::<Vec<String>>().join("\n");
+    let test_runner = format!("#include <stdio.h>\n\n{}\n\nint main() {{\n{}\n}}", forward, body);
+    std::fs::write("target/main.c", test_runner).unwrap();
+    
+    leaf.link(brew);
+    duct::cmd!(format!("./target/{}", leaf.config.package.name)).run().unwrap();
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -356,6 +395,7 @@ fn main() {
         Commands::Pour => pour(),
         Commands::Add(data) => add(data),
         Commands::Format => fmt(),
-        Commands::Lint => lint()
+        Commands::Lint => lint(),
+        Commands::Sip => sip()
     };
 }

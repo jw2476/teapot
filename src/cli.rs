@@ -15,7 +15,8 @@ pub enum Commands {
     Pour,
     Add(AddData),
     Format,
-    Lint
+    Lint,
+    Sip
 }
 
 #[derive(Debug, Args)]
