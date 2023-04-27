@@ -82,7 +82,8 @@ struct Leaf {
     dependencies: Vec<Leaf>,
     features: Vec<Feature>,
     path: PathBuf,
-    defines: Vec<(String, Option<String>)>
+    defines: Vec<(String, Option<String>)>,
+    libraries: Vec<String>
 }
 
 impl Leaf {
@@ -146,12 +147,20 @@ impl Leaf {
                 }
             });
 
+        let mut libraries = config.libraries.base.clone();
+        features.iter().filter(|feature| feature.enabled).for_each(|feature| {
+            if let Some(libs) = config.libraries.features.get(&feature.name) {
+                libraries.append(&mut libs.clone());
+            }
+        });
+
         Leaf {
             config,
             dependencies,
             features,
             path: path.to_owned(),
-            defines
+            defines,
+            libraries
         }
     }
 
@@ -258,6 +267,10 @@ impl Leaf {
         dependencies.iter().for_each(|dependency| {
             compiler.add_static_library(dependency);
         });
+
+        self.libraries.iter().for_each(|library| {
+            compiler.add_system_library(library);
+        });
         
         Self::clear();
         println!(
@@ -276,7 +289,7 @@ fn brew(cmd: BrewData) {
     let leaf = Leaf::from_config(config, add_default_features(&[]), Path::new(""));
     leaf.compile(cmd.clone());
 
-    let main = format!("int main() {{\n\t{}_main();\n}}", leaf.config.package.name);
+    let main = format!("void {0}_main();\nint main() {{\n\t{0}_main();\n}}", leaf.config.package.name);
     std::fs::write("target/main.c", main).unwrap();
 
     leaf.link(cmd);
@@ -289,7 +302,7 @@ fn pour() {
     let brew = BrewData { release: false, debug: false };
     leaf.compile(brew.clone());
 
-    let main = format!("int main() {{\n\t{}_main();\n}}", leaf.config.package.name);
+    let main = format!("void {0}_main();\nint main() {{\n\t{0}_main();\n}}", leaf.config.package.name);
     std::fs::write("target/main.c", main).unwrap();
 
     leaf.link(brew);

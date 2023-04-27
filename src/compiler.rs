@@ -53,6 +53,10 @@ impl Compiler {
     pub fn enable_debug_info(&mut self) {
         self.compile_flags.push("-g".to_owned());
     }
+    
+    pub fn add_system_library(&mut self, name: &str) {
+        self.link_flags.push(format!("-l{}", name));
+    }
 
     pub fn compile(&mut self, paths: &[PathBuf], name: &str) {
         let progress = AtomicUsize::new(0);
