@@ -25,8 +25,8 @@ impl Compiler {
     pub fn new(target_directory: &Path) -> Self {
         Self {
             target_directory: target_directory.to_owned(),
-            compile_flags: Vec::new(),
-            link_flags: vec!["-lm".to_owned()],
+            compile_flags: vec!["-std=c11".to_owned()],
+            link_flags: vec!["-lm".to_owned(), "-std=c11".to_owned()],
             objects: Vec::new(),
             defines: Vec::new(),
         }
@@ -48,10 +48,12 @@ impl Compiler {
 
     pub fn set_optimization_level(&mut self, level: u32) {
         self.compile_flags.push(format!("-O{}", level));
+        self.link_flags.push(format!("-O{}", level));
     }
 
     pub fn enable_debug_info(&mut self) {
         self.compile_flags.push("-g".to_owned());
+        self.link_flags.push("-g".to_owned());
     }
     
     pub fn add_system_library(&mut self, name: &str) {
