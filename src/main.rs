@@ -1,21 +1,13 @@
-#![feature(let_chains)]
-#![feature(path_file_prefix)]
-
 mod cli;
 mod compiler;
 mod config;
 
-use clap::{error::ErrorKind, CommandFactory, Parser};
+use clap::Parser;
 use cli::{AddData, BrewData, Cli, Commands, NewData};
 use colored::Colorize;
 use compiler::{Compiler, OutputType};
 use config::TeaConfig;
-use std::{
-    collections::HashMap,
-    io::{BufRead, BufReader, Write},
-    path::{Path, PathBuf},
-    process::{Command, Stdio},
-};
+use std::path::{Path, PathBuf};
 use toml_edit::Document;
 use walkdir::WalkDir;
 
@@ -83,7 +75,7 @@ struct Leaf {
     features: Vec<Feature>,
     path: PathBuf,
     defines: Vec<(String, Option<String>)>,
-    libraries: Vec<String>
+    libraries: Vec<String>,
 }
 
 impl Leaf {
@@ -148,11 +140,14 @@ impl Leaf {
             });
 
         let mut libraries = config.libraries.base.clone();
-        features.iter().filter(|feature| feature.enabled).for_each(|feature| {
-            if let Some(libs) = config.libraries.features.get(&feature.name) {
-                libraries.append(&mut libs.clone());
-            }
-        });
+        features
+            .iter()
+            .filter(|feature| feature.enabled)
+            .for_each(|feature| {
+                if let Some(libs) = config.libraries.features.get(&feature.name) {
+                    libraries.append(&mut libs.clone());
+                }
+            });
 
         Leaf {
             config,
@@ -160,7 +155,7 @@ impl Leaf {
             features,
             path: path.to_owned(),
             defines,
-            libraries
+            libraries,
         }
     }
 
@@ -246,10 +241,7 @@ impl Leaf {
             "Linking".green().bold(),
             &self.config.package.name
         );
-        compiler.link(
-            &self.config.package.name,
-            OutputType::Library
-        );
+        compiler.link(&self.config.package.name, OutputType::Library);
     }
 
     pub fn link(&self, cmd: BrewData) {
@@ -261,7 +253,10 @@ impl Leaf {
             compiler.enable_debug_info()
         }
 
-        compiler.compile(&[Path::new("target/main.c").to_owned()], &self.config.package.name);
+        compiler.compile(
+            &[Path::new("target/main.c").to_owned()],
+            &self.config.package.name,
+        );
 
         let dependencies = self.get_dependencies();
         dependencies.iter().for_each(|dependency| {
@@ -271,7 +266,7 @@ impl Leaf {
         self.libraries.iter().for_each(|library| {
             compiler.add_system_library(library);
         });
-        
+
         Self::clear();
         println!(
             "\r{:13} {} {}",
@@ -289,7 +284,10 @@ fn brew(cmd: BrewData) {
     let leaf = Leaf::from_config(config, add_default_features(&[]), Path::new(""));
     leaf.compile(cmd.clone());
 
-    let main = format!("void {0}_main();\nint main() {{\n\t{0}_main();\n}}", leaf.config.package.name);
+    let main = format!(
+        "void {0}_main();\nint main() {{\n\t{0}_main();\n}}",
+        leaf.config.package.name
+    );
     std::fs::write("target/main.c", main).unwrap();
 
     leaf.link(cmd);
@@ -299,10 +297,16 @@ fn pour() {
     let config = load_config(Path::new(""));
     let leaf = Leaf::from_config(config, add_default_features(&[]), Path::new(""));
 
-    let brew = BrewData { release: false, debug: false };
+    let brew = BrewData {
+        release: false,
+        debug: false,
+    };
     leaf.compile(brew.clone());
 
-    let main = format!("void {0}_main();\nint main() {{\n\t{0}_main();\n}}", leaf.config.package.name);
+    let main = format!(
+        "void {0}_main();\nint main() {{\n\t{0}_main();\n}}",
+        leaf.config.package.name
+    );
     std::fs::write("target/main.c", main).unwrap();
 
     leaf.link(brew);
@@ -359,16 +363,22 @@ fn lint() {
     let leaf = Leaf::from_config(config, add_default_features(&[]), Path::new(""));
     let sources = get_sources(Path::new("src"));
 
-    let mut args: Vec<String> = sources.iter().map(|path| path.to_str().unwrap().to_owned()).collect();
+    let mut args: Vec<String> = sources
+        .iter()
+        .map(|path| path.to_str().unwrap().to_owned())
+        .collect();
     args.push("--".to_owned());
     args.push("-Isrc".to_owned());
     args.push("-Iinclude".to_owned());
     leaf.dependencies.iter().for_each(|dependency| {
         args.push(format!("-I{}", dependency.path.join("include").display()));
     });
-    leaf.features.iter().filter(|feature| feature.enabled).for_each(|feature| {
-        args.push(format!("-DFEATURE_{}", feature.name.to_uppercase()));
-    });
+    leaf.features
+        .iter()
+        .filter(|feature| feature.enabled)
+        .for_each(|feature| {
+            args.push(format!("-DFEATURE_{}", feature.name.to_uppercase()));
+        });
     leaf.defines.iter().for_each(|(name, value)| {
         if let Some(v) = value {
             args.push(format!("-D{}={}", name, v));
@@ -383,20 +393,49 @@ fn lint() {
 fn sip() {
     let config = load_config(Path::new(""));
     let leaf = Leaf::from_config(config, add_default_features(&[]), Path::new(""));
-    let brew = BrewData { release: false, debug: false };
-    leaf.compile(BrewData { release: false, debug: false });
+    let brew = BrewData {
+        release: false,
+        debug: false,
+    };
+    leaf.compile(BrewData {
+        release: false,
+        debug: false,
+    });
 
-    let symbols = duct::cmd!("nm", "-f", "just-symbols", format!("target/lib{}.a", leaf.config.package.name)).read().unwrap();
-    let tests = symbols.lines().filter(|symbol| symbol.starts_with("test_")).collect::<Vec<&str>>();
+    let symbols = duct::cmd!(
+        "nm",
+        "-f",
+        "just-symbols",
+        format!("target/lib{}.a", leaf.config.package.name)
+    )
+    .read()
+    .unwrap();
+    let tests = symbols
+        .lines()
+        .filter(|symbol| symbol.starts_with("test_"))
+        .collect::<Vec<&str>>();
     println!("Found tests: {:?}", tests);
 
-    let forward = tests.iter().map(|test| format!("void {}();", test)).collect::<Vec<String>>().join("\n");
-    let body = tests.iter().map(|test| format!("\tprintf(\"Testing {0}\\n\");\n\t{0}();", test)).collect::<Vec<String>>().join("\n");
-    let test_runner = format!("#include <stdio.h>\n\n{}\n\nint main() {{\n{}\n}}", forward, body);
+    let forward = tests
+        .iter()
+        .map(|test| format!("void {}();", test))
+        .collect::<Vec<String>>()
+        .join("\n");
+    let body = tests
+        .iter()
+        .map(|test| format!("\tprintf(\"Testing {0}\\n\");\n\t{0}();", test))
+        .collect::<Vec<String>>()
+        .join("\n");
+    let test_runner = format!(
+        "#include <stdio.h>\n\n{}\n\nint main() {{\n{}\n}}",
+        forward, body
+    );
     std::fs::write("target/main.c", test_runner).unwrap();
-    
+
     leaf.link(brew);
-    duct::cmd!(format!("./target/{}", leaf.config.package.name)).run().unwrap();
+    duct::cmd!(format!("./target/{}", leaf.config.package.name))
+        .run()
+        .unwrap();
 }
 
 fn main() {
@@ -409,6 +448,6 @@ fn main() {
         Commands::Add(data) => add(data),
         Commands::Format => fmt(),
         Commands::Lint => lint(),
-        Commands::Sip => sip()
+        Commands::Sip => sip(),
     };
 }

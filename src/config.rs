@@ -3,10 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::{error::ErrorKind, CommandFactory};
 use toml_edit::{Document, Item, Table, Value};
-
-use crate::cli::Cli;
 
 #[derive(Debug)]
 pub struct TeaConfig {
