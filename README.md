@@ -65,6 +65,15 @@ If a feature is enabled the macro `FEATURE_[NAME]` will be defined. For example,
 
 ## Changelog
 
+### v0.1.4
+ - Disabled unused nightly features
+ - Fix warnings
+
+### v0.1.3
+ - Added testing framework
+ - Added support for system libraries
+ - Fixed debug mode
+
 ### v0.1.2
  - Added linting
  - Added formatting
